@@ -592,8 +592,18 @@ static void smblib_notify_usb_host(struct smb_charger *chg, bool enable)
 
 	if (enable) {
 		smblib_dbg(chg, PR_OTG, "enabling VBUS in OTG mode\n");
+#ifdef VENDOR_EDIT
+		vooc_enable_cp_for_otg(1);
+		if (g_oplus_chip && g_oplus_chip->vbatt_num == 2 && g_oplus_chip->chg_ops->otg_enable) {
+			rc = g_oplus_chip->chg_ops->otg_enable();
+		} else {
+			rc = smblib_masked_write(chg, DCDC_CMD_OTG_REG,
+					OTG_EN_BIT, OTG_EN_BIT);
+		}
+#else
 		rc = smblib_masked_write(chg, DCDC_CMD_OTG_REG,
 				OTG_EN_BIT, OTG_EN_BIT);
+#endif
 
 		if (rc < 0) {
 			smblib_err(chg,
@@ -605,8 +615,18 @@ static void smblib_notify_usb_host(struct smb_charger *chg, bool enable)
 
 	} else {
 		smblib_dbg(chg, PR_OTG, "disabling VBUS in OTG mode\n");
+#ifdef VENDOR_EDIT
+		vooc_enable_cp_for_otg(0);
+		if (g_oplus_chip && g_oplus_chip->vbatt_num == 2 && g_oplus_chip->chg_ops->otg_disable) {
+			rc = g_oplus_chip->chg_ops->otg_disable();
+		} else {
+			rc = smblib_masked_write(chg, DCDC_CMD_OTG_REG,
+					OTG_EN_BIT, 0);
+		}
+#else
 		rc = smblib_masked_write(chg, DCDC_CMD_OTG_REG,
 				OTG_EN_BIT, 0);
+#endif
 
 		if (rc < 0) {
 			smblib_err(chg,
@@ -4634,7 +4654,7 @@ static int smblib_get_prop_dfp_mode(struct smb_charger *chg)
 
 	switch (stat & DETECTED_SNK_TYPE_MASK) {
 	case AUDIO_ACCESS_RA_RA_BIT:
-		return POWER_SUPPLY_TYPEC_SINK_AUDIO_ADAPTER;
+		return POWER_SUPPLY_TYPEC_SINK;
 
 	case SRC_DEBUG_ACCESS_BIT:
 		return POWER_SUPPLY_TYPEC_SINK_DEBUG_ACCESSORY;
@@ -11994,7 +12014,7 @@ static void oplus_set_otg_switch_status(bool value)
 
 	if (g_oplus_chip->otg_switch == true)
 		rc = smblib_masked_write(chg, TYPE_C_MODE_CFG_REG,
-				TYPEC_POWER_ROLE_CMD_MASK | TYPEC_TRY_MODE_MASK, 0);
+				TYPEC_POWER_ROLE_CMD_MASK | TYPEC_TRY_MODE_MASK, EN_TRY_SNK_BIT);
 
 	else
 		rc = smblib_masked_write(chg, TYPE_C_MODE_CFG_REG,
@@ -14260,7 +14280,7 @@ static int smb5_configure_typec(struct smb_charger *chg)
 #else
 	rc = smblib_masked_write(chg, TYPE_C_MODE_CFG_REG,
 			TYPEC_POWER_ROLE_CMD_MASK | TYPEC_TRY_MODE_MASK,
-			0);
+			EN_TRY_SNK_BIT);
 #endif
 
 

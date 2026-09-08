@@ -5544,16 +5544,11 @@ static int sde_crtc_onscreenfinger_atomic_check(struct sde_crtc_state *cstate,
 
 		SDE_EVT32(zpos, fp_index, aod_index, fppressed_index, cstate->num_dim_layers);
 		if (sde_crtc_config_fingerprint_dim_layer(&cstate->base, zpos)) {
-			//SDE_ERROR("Failed to config dim layer\n");
-			if (dimlayer_is_top && !cstate->fingerprint_dim_layer) {
-				oppo_underbrightness_alpha = 0;
-				cstate->fingerprint_dim_layer = NULL;
-				cstate->fingerprint_mode = false;
-				cstate->fingerprint_pressed = false;
-				return 0;
-			}
-			SDE_EVT32(zpos, fp_index, aod_index, fppressed_index, cstate->num_dim_layers);
-			return -EINVAL;
+			oppo_underbrightness_alpha = 0;
+			cstate->fingerprint_dim_layer = NULL;
+			cstate->fingerprint_mode = false;
+			cstate->fingerprint_pressed = false;
+			return 0;
 		}
 #ifdef OPLUS_FEATURE_AOD_RAMLESS
 // Yuwei.Zhang@MULTIMEDIA.DISPLAY.LCD, 2020/09/25, sepolicy for aod ramless

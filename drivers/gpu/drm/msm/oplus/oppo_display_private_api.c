@@ -2271,76 +2271,23 @@ static ssize_t oppo_display_notify_fp_press(struct device *dev,
 	}
 #endif /* OPLUS_FEATURE_AOD_RAMLESS */
 
-	drm_modeset_lock_all(drm_dev);
+	if (OPPO_DISPLAY_AOD_SCENE == get_oppo_display_scene()) {
+		drm_modeset_lock_all(drm_dev);
 
-	state = drm_atomic_state_alloc(drm_dev);
+		state = drm_atomic_state_alloc(drm_dev);
 
-	if (!state) {
-		goto error;
-	}
-
-	state->acquire_ctx = mode_config->acquire_ctx;
-	crtc = dsi_connector->state->crtc;
-	crtc_state = drm_atomic_get_crtc_state(state, crtc);
-#ifdef OPLUS_FEATURE_AOD_RAMLESS
-/* Yuwei.Zhang@MULTIMEDIA.DISPLAY.LCD, 2020/09/25, sepolicy for aod ramless */
-	cur_mode = &crtc->state->mode;
-#endif /* OPLUS_FEATURE_AOD_RAMLESS */
-
-	for (i = 0; i < priv->num_crtcs; i++) {
-		if (priv->disp_thread[i].crtc_id == crtc->base.id) {
-			if (priv->disp_thread[i].thread) {
-				kthread_flush_worker(&priv->disp_thread[i].worker);
-			}
-		}
-	}
-
-#ifdef OPLUS_FEATURE_AOD_RAMLESS
-/* Yuwei.Zhang@MULTIMEDIA.DISPLAY.LCD, 2020/09/25, sepolicy for aod ramless */
-	if (display->panel->oppo_priv.is_aod_ramless) {
-		struct drm_display_mode *set_mode = NULL;
-
-		if (oppo_display_mode == 2) {
-			pr_info("%s: return for oppo_display_mode == 2\n", __func__);
+		if (!state) {
 			goto error;
 		}
 
-		list_for_each_entry(mode, &dsi_connector->modes, head) {
-			if (drm_mode_vrefresh(mode) == 0)
-				continue;
-			if (mode->clock != cur_mode->clock)
-				continue;
-			if (mode->flags & DRM_MODE_FLAG_VID_MODE_PANEL)
-				vid_mode = mode;
-			if (mode->flags & DRM_MODE_FLAG_CMD_MODE_PANEL)
-				cmd_mode = mode;
-		}
-
-		set_mode = onscreenfp_status ? vid_mode : set_mode;
-		if (!crtc_state->active || !crtc_state->enable)
-			goto error;
-
-		if (set_mode && drm_mode_vrefresh(set_mode) != drm_mode_vrefresh(&crtc_state->mode)) {
-			mode_changed = true;
-		} else {
-			mode_changed = false;
-		}
-
-		if (mode_changed) {
-			display->panel->dyn_clk_caps.dyn_clk_support = false;
-			drm_atomic_set_mode_for_crtc(crtc_state, set_mode);
-		}
-
-		wake_up(&oppo_aod_wait);
-	}
-#endif /* OPLUS_FEATURE_AOD_RAMLESS */
-
-	err = drm_atomic_commit(state);
-	drm_atomic_state_put(state);
-
+		state->acquire_ctx = mode_config->acquire_ctx;
+		crtc = dsi_connector->state->crtc;
+		crtc_state = drm_atomic_get_crtc_state(state, crtc);
 #ifdef OPLUS_FEATURE_AOD_RAMLESS
 /* Yuwei.Zhang@MULTIMEDIA.DISPLAY.LCD, 2020/09/25, sepolicy for aod ramless */
-	if (display->panel->oppo_priv.is_aod_ramless && mode_changed) {
+		cur_mode = &crtc->state->mode;
+#endif /* OPLUS_FEATURE_AOD_RAMLESS */
+
 		for (i = 0; i < priv->num_crtcs; i++) {
 			if (priv->disp_thread[i].crtc_id == crtc->base.id) {
 				if (priv->disp_thread[i].thread) {
@@ -2348,13 +2295,68 @@ static ssize_t oppo_display_notify_fp_press(struct device *dev,
 				}
 			}
 		}
-		if (oppo_display_mode == 1)
-			display->panel->dyn_clk_caps.dyn_clk_support = true;
-	}
+
+#ifdef OPLUS_FEATURE_AOD_RAMLESS
+/* Yuwei.Zhang@MULTIMEDIA.DISPLAY.LCD, 2020/09/25, sepolicy for aod ramless */
+		if (display->panel->oppo_priv.is_aod_ramless) {
+			struct drm_display_mode *set_mode = NULL;
+
+			if (oppo_display_mode == 2) {
+				pr_info("%s: return for oppo_display_mode == 2\n", __func__);
+				goto error;
+			}
+
+			list_for_each_entry(mode, &dsi_connector->modes, head) {
+				if (drm_mode_vrefresh(mode) == 0)
+					continue;
+				if (mode->clock != cur_mode->clock)
+					continue;
+				if (mode->flags & DRM_MODE_FLAG_VID_MODE_PANEL)
+					vid_mode = mode;
+				if (mode->flags & DRM_MODE_FLAG_CMD_MODE_PANEL)
+					cmd_mode = mode;
+			}
+
+			set_mode = onscreenfp_status ? vid_mode : set_mode;
+			if (!crtc_state->active || !crtc_state->enable)
+				goto error;
+
+			if (set_mode && drm_mode_vrefresh(set_mode) != drm_mode_vrefresh(&crtc_state->mode)) {
+				mode_changed = true;
+			} else {
+				mode_changed = false;
+			}
+
+			if (mode_changed) {
+				display->panel->dyn_clk_caps.dyn_clk_support = false;
+				drm_atomic_set_mode_for_crtc(crtc_state, set_mode);
+			}
+
+			wake_up(&oppo_aod_wait);
+		}
+#endif /* OPLUS_FEATURE_AOD_RAMLESS */
+
+		err = drm_atomic_commit(state);
+		drm_atomic_state_put(state);
+
+#ifdef OPLUS_FEATURE_AOD_RAMLESS
+/* Yuwei.Zhang@MULTIMEDIA.DISPLAY.LCD, 2020/09/25, sepolicy for aod ramless */
+		if (display->panel->oppo_priv.is_aod_ramless && mode_changed) {
+			for (i = 0; i < priv->num_crtcs; i++) {
+				if (priv->disp_thread[i].crtc_id == crtc->base.id) {
+					if (priv->disp_thread[i].thread) {
+						kthread_flush_worker(&priv->disp_thread[i].worker);
+					}
+				}
+			}
+			if (oppo_display_mode == 1)
+				display->panel->dyn_clk_caps.dyn_clk_support = true;
+		}
 #endif /* OPLUS_FEATURE_AOD_RAMLESS */
 
 error:
-	drm_modeset_unlock_all(drm_dev);
+		drm_modeset_unlock_all(drm_dev);
+	}
 
 	if (!vblank_get) {
 		drm_crtc_vblank_put(dsi_connector->state->crtc);

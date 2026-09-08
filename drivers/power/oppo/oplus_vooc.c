@@ -1365,7 +1365,11 @@ out:
 		}
 		chip->allow_reading = true;
 		chip->fastchg_ing = false;
-		chip->fastchg_to_normal = true;
+		if (data == VOOC_NOTIFY_NORMAL_TEMP_FULL) {
+			chip->fastchg_to_normal = true;
+		} else {
+			chip->fastchg_to_normal = false;
+		}
 		chip->fastchg_started = false;
 		chip->fastchg_to_warm = false;
 		if (data == VOOC_NOTIFY_BAD_CONNECTED || data == VOOC_NOTIFY_DATA_UNKNOWN)

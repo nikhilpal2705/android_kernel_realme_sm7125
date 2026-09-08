@@ -6449,6 +6449,10 @@ void smblib_usb_plugin_hard_reset_locked(struct smb_charger *chg)
 		if (chg->fcc_stepper_enable) {
 			vote(chg->fcc_votable, FCC_STEPPER_VOTER, false, 0);
 		}
+#ifdef VENDOR_EDIT
+		oplus_vooc_set_fastchg_to_normal_false();
+		oplus_vooc_set_fastchg_dummy_started_false();
+#endif
 
 	} else {
 #ifdef VENDOR_EDIT
@@ -6630,6 +6634,8 @@ void smblib_usb_plugin_locked(struct smb_charger *chg)
 #ifdef VENDOR_EDIT
 		/* lizhijie@BSP.CHG.Basic, 2020/02/25, lzj Add for charging */
 		schedule_delayed_work(&chg->typec_disable_cmd_work, msecs_to_jiffies(500));
+		oplus_vooc_set_fastchg_to_normal_false();
+		oplus_vooc_set_fastchg_dummy_started_false();
 #endif
 		/* Schedule work to enable parallel charger */
 		vote(chg->awake_votable, PL_DELAY_VOTER, true, 0);

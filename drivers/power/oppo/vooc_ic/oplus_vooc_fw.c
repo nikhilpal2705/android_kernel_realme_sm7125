@@ -299,7 +299,7 @@ void oplus_vooc_fw_type_dt(struct oplus_vooc_chip *chip)
 
 	rc = of_property_read_u32(node, "qcom,vooc-high-temp", &chip->vooc_high_temp);
 	if (rc) {
-		chip->vooc_high_temp = 430;
+		chip->vooc_high_temp = 440;
 	} else {
 		chg_debug("qcom,vooc-high-temp is %d\n", chip->vooc_high_temp);
 	}
@@ -313,7 +313,7 @@ void oplus_vooc_fw_type_dt(struct oplus_vooc_chip *chip)
 
 	rc = of_property_read_u32(node, "qcom,vooc-high-soc", &chip->vooc_high_soc);
 	if (rc) {
-		chip->vooc_high_soc = 85;
+		chip->vooc_high_soc = 98;
 	} else {
 		chg_debug("qcom,vooc-high-soc is %d\n", chip->vooc_high_soc);
 	}
@@ -1054,18 +1054,23 @@ bool is_allow_fast_chg_real(struct oplus_vooc_chip *chip)
 	chg_type = oplus_chg_get_chg_type();
 
 	if (chg_type != POWER_SUPPLY_TYPE_USB_DCP) {
+		chg_debug(" chg_type %d != USB_DCP\n", chg_type);
 		return false;
 	}
 	if (temp < chip->vooc_low_temp) {
+		chg_debug(" temp %d < low_temp %d\n", temp, chip->vooc_low_temp);
 		return false;
 	}
 	if (temp >= chip->vooc_high_temp) {
+		chg_debug(" temp %d >= high_temp %d\n", temp, chip->vooc_high_temp);
 		return false;
 	}
 	if (cap < chip->vooc_low_soc) {
+		chg_debug(" cap %d < low_soc %d\n", cap, chip->vooc_low_soc);
 		return false;
 	}
 	if (cap > chip->vooc_high_soc) {
+		chg_debug(" cap %d > high_soc %d\n", cap, chip->vooc_high_soc);
 		return false;
 	}
 	if (oplus_vooc_get_fastchg_to_normal() == true) {
@@ -1356,15 +1361,16 @@ int oplus_vooc_get_switch_gpio_val(struct oplus_vooc_chip *chip)
 
 void reset_fastchg_after_usbout(struct oplus_vooc_chip *chip)
 {
-	if (oplus_vooc_get_fastchg_started() == false) {
-		chg_err(" switch off fastchg\n");
-		oplus_vooc_set_fastchg_type_unknow();
-		opchg_set_switch_mode(chip, NORMAL_CHARGER_MODE);
-		if (oplus_vooc_get_fastchg_dummy_started() == false) {
-			oplus_vooc_check_set_mcu_sleep();
-		}
-		vooc_reset_cp();
+	chg_err(" switch off fastchg\n");
+	oplus_vooc_set_fastchg_type_unknow();
+	opchg_set_switch_mode(chip, NORMAL_CHARGER_MODE);
+	if (oplus_vooc_get_fastchg_dummy_started() == false) {
+		oplus_vooc_check_set_mcu_sleep();
 	}
+	vooc_reset_cp();
+
+	chip->fastchg_started = false;
+	chip->fastchg_ing = false;
 	oplus_vooc_set_fastchg_to_normal_false();
 	oplus_vooc_set_fastchg_to_warm_false();
 	oplus_vooc_set_fastchg_low_temp_full_false();

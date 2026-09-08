@@ -657,7 +657,7 @@
 		qcom,vooc-low-temp = <50>;
 		qcom,vooc-high-temp = <440>;
 		qcom,vooc-low-soc = <1>;
-		qcom,vooc-high-soc = <98>;
+		qcom,vooc-high-soc = <100>;
 		qcom,vooc-little-cool-temp = <160>;
 		qcom,vooc-cool-temp = <120>;
 		qcom,vooc-little-cool-to-normal-temp = <180>;

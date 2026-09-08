@@ -445,7 +445,7 @@
 		//qcom,vooc_fw_update_newmethod;
 		qcom,vooc-high-temp = <440>;
 		qcom,vooc-low-soc = <1>;
-		qcom,vooc-high-soc = <98>;
+		qcom,vooc-high-soc = <100>;
 		qcom,vooc-fw-type = <0x2B>;
 		qcom,vooc_multistep_adjust_current_support;
 		qcom,vooc_multistep_initial_batt_temp = <1000>;

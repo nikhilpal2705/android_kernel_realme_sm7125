@@ -498,7 +498,7 @@
 		qcom,vooc_reply_mcu_bits = <7>;
 		qcom,vooc-low-temp = <0>;
 		qcom,oplus_batt_4400mv;
-		qcom,vooc-high-soc = <98>;
+		qcom,vooc-high-soc = <100>;
 		qcom,vooc-high-temp = <440>;
 		qcom,vooc_batt_over_high_temp = <440>;
 		//qcom,vooc_fw_update_newmethod;

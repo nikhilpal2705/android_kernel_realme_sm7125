@@ -231,6 +231,7 @@ struct oplus_vooc_chip {
 	int *vooc_current_lvl;
 	int vooc_current_lvl_cnt;
 	bool reset_adapter;
+	int fastchg_current_ma;
 };
 
 struct oplus_vooc_cp {
@@ -352,4 +353,5 @@ bool oplus_vooc_get_reset_adapter_st(void);
 bool oplus_vooc_get_mcu_update_finish_status(void);
 void oplus_vooc_set_update_finish_status_false(void);
 int oplus_vooc_get_reset_active_status(void);
+int oplus_vooc_get_fastchg_current_ma(void);
 #endif /* _OPLUS_VOOC_H */

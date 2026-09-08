@@ -938,6 +938,7 @@ static void oplus_vooc_fastchg_func(struct work_struct *work)
 			chip->fastchg_to_warm = false;
 			chip->btb_temp_over = false;
 			chip->reset_adapter = false;
+			chip->fastchg_current_ma = 6500;
 		} else {
 			chip->allow_reading = true;
 			chip->fastchg_dummy_started = true;
@@ -965,6 +966,7 @@ static void oplus_vooc_fastchg_func(struct work_struct *work)
 		chip->fastchg_to_warm = false;
 		chip->fastchg_ing = false;
 		chip->btb_temp_over = false;
+		chip->fastchg_current_ma = 0;
 		chip->fastcharge_fail_count++;
 		adapter_fw_ver_info = false;
 		adapter_model_factory = false;
@@ -1165,6 +1167,38 @@ static void oplus_vooc_fastchg_func(struct work_struct *work)
 			}
 		} else {
 			pre_ret_info = ret_info;
+		}
+
+		if (chip->vooc_reply_mcu_bits == 7 && chip->vooc_current_lvl &&
+		    ret_info > 0 && ret_info <= chip->vooc_current_lvl_cnt) {
+			chip->fastchg_current_ma = chip->vooc_current_lvl[ret_info - 1];
+		} else {
+			switch (ret_info) {
+			case 6:
+				chip->fastchg_current_ma = 6500;
+				break;
+			case 5:
+				chip->fastchg_current_ma = 5000;
+				break;
+			case 4:
+				chip->fastchg_current_ma = 4000;
+				break;
+			case 3:
+				chip->fastchg_current_ma = 3000;
+				break;
+			case 2:
+				chip->fastchg_current_ma = 2000;
+				break;
+			case 1:
+				chip->fastchg_current_ma = 1500;
+				break;
+			default:
+				if (ret_info > 0 && ret_info <= ARRAY_SIZE(multistepCurrent))
+					chip->fastchg_current_ma = multistepCurrent[ret_info - 1];
+				else
+					chip->fastchg_current_ma = 6500;
+				break;
+			}
 		}
 
 		vooc_xlog_printk(CHG_LOG_CRTI, "temp_range[%d-%d-%d-%d-%d]", chip->vooc_low_temp, chip->vooc_little_cold_temp,
@@ -1783,6 +1817,20 @@ bool oplus_vooc_get_fastchg_ing(void)
 	}
 }
 
+int oplus_vooc_get_fastchg_current_ma(void)
+{
+	if (!g_vooc_chip) {
+		return 0;
+	}
+	if (g_vooc_chip->fastchg_current_ma > 0) {
+		return g_vooc_chip->fastchg_current_ma;
+	}
+	if (g_vooc_chip->fastchg_started) {
+		return 6500;
+	}
+	return 0;
+}
+
 bool oplus_vooc_get_fastchg_allow(void)
 {
 	if (!g_vooc_chip) {
@@ -2134,6 +2182,7 @@ void oplus_vooc_turn_off_fastchg(void)
 		chip->btb_temp_over = false;
 		chip->fastchg_dummy_started = false;
 		chip->fast_chg_type = FASTCHG_CHARGER_TYPE_UNKOWN;
+		chip->fastchg_current_ma = 0;
 
 		oplus_chg_clear_chargerid_info();
 		oplus_vooc_del_watchdog_timer(chip);

@@ -313,7 +313,7 @@ void oplus_vooc_fw_type_dt(struct oplus_vooc_chip *chip)
 
 	rc = of_property_read_u32(node, "qcom,vooc-high-soc", &chip->vooc_high_soc);
 	if (rc) {
-		chip->vooc_high_soc = 98;
+		chip->vooc_high_soc = 100;
 	} else {
 		chg_debug("qcom,vooc-high-soc is %d\n", chip->vooc_high_soc);
 	}

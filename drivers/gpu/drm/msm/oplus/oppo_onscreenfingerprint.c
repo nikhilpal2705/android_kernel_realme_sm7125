@@ -610,9 +610,19 @@ int sde_crtc_config_fingerprint_dim_layer(struct drm_crtc_state *crtc_state,
 	fingerprint_dim_layer->rect.y = 0;
 	fingerprint_dim_layer->rect.w = mode->hdisplay;
 	fingerprint_dim_layer->rect.h = mode->vdisplay;
-	fingerprint_dim_layer->color_fill = (struct sde_mdss_color) {
-		0, 0, 0, alpha
-	};
+	if (oppo_pcc_enabled) {
+		u32 r = (oppo_save_pcc.r.c >> 8) & 0xFF;
+		u32 g = (oppo_save_pcc.g.c >> 8) & 0xFF;
+		u32 b = (oppo_save_pcc.b.c >> 8) & 0xFF;
+
+		fingerprint_dim_layer->color_fill = (struct sde_mdss_color) {
+			g, b, r, alpha
+		};
+	} else {
+		fingerprint_dim_layer->color_fill = (struct sde_mdss_color) {
+			0, 0, 0, alpha
+		};
+	}
 	cstate->fingerprint_dim_layer = fingerprint_dim_layer;
 	oppo_underbrightness_alpha = alpha;
 
@@ -622,7 +632,8 @@ int sde_crtc_config_fingerprint_dim_layer(struct drm_crtc_state *crtc_state,
 bool is_skip_pcc(struct drm_crtc *crtc)
 {
 	if (OPPO_DISPLAY_POWER_DOZE_SUSPEND == get_oppo_display_power_status() ||
-		OPPO_DISPLAY_POWER_DOZE == get_oppo_display_power_status()) {
+		OPPO_DISPLAY_POWER_DOZE == get_oppo_display_power_status() ||
+		sde_crtc_get_fingerprint_mode(crtc->state)) {
 		return true;
 	}
 

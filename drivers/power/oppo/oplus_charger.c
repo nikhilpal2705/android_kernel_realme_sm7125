@@ -382,14 +382,13 @@ int oplus_ac_get_property(struct power_supply *psy,
 			break;
 #ifdef CONFIG_OPLUS_FAST2NORMAL_CHG
 		case POWER_SUPPLY_PROP_FAST2NORMAL_CHG:
-			if (oplus_vooc_get_fastchg_to_normal() == true
-					|| oplus_vooc_get_fastchg_to_warm() == true
-					|| oplus_vooc_get_btb_temp_over() == true
-					|| oplus_vooc_get_fastchg_low_temp_full() == true) {
-				val->intval = 1;
-			} else {
-				val->intval = 0;
-			}
+			/*
+			 * Always report 0 so the framework keeps showing
+			 * "SuperDart Charging" whenever a VOOC/SuperDart charger
+			 * is connected, regardless of internal fast-to-normal
+			 * transitions. The UI shows "Full" once battery hits 100%.
+			 */
+			val->intval = 0;
 			break;
 #endif
 		default:

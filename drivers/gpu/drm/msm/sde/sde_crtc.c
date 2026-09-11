@@ -5495,7 +5495,7 @@ static int sde_crtc_onscreenfinger_atomic_check(struct sde_crtc_state *cstate,
 			return 0;
 		}
 
-		kms = _sde_crtc_get_kms_(&cstate->base);
+		kms = _sde_crtc_get_kms_(cstate->base.crtc);
 		max_stages = (kms && kms->catalog) ?
 			kms->catalog->mixer[0].sblk->maxblendstages : 7;
 		max_plane_stage = max_stages - SDE_STAGE_0;

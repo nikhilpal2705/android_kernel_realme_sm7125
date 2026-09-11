@@ -2606,12 +2606,12 @@ int dsi_display_oppo_set_power(struct drm_connector *connector,
 	case SDE_MODE_DPMS_LP1:
 	case SDE_MODE_DPMS_LP2:
 		switch(get_oppo_display_scene()) {
-			break;
 		case OPPO_DISPLAY_NORMAL_SCENE:
 		case OPPO_DISPLAY_NORMAL_HBM_SCENE:
 			rc = dsi_panel_set_lp1(display->panel);
 			rc = dsi_panel_set_lp2(display->panel);
 			set_oppo_display_scene(OPPO_DISPLAY_AOD_SCENE);
+			oppo_update_aod_light_mode_unlock(display->panel);
 			break;
 		case OPPO_DISPLAY_AOD_HBM_SCENE:
 			blank = MSM_DRM_BLANK_POWERDOWN;

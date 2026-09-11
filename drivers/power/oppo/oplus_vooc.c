@@ -256,6 +256,7 @@ static void oplus_vooc_check_charger_out(struct oplus_vooc_chip *chip)
 }
 
 int multistepCurrent[] = {1500, 2000, 3000, 4000, 5000, 6000};
+static int g_fastchg_realtime_current_ma = 0;
 
 #define VOOC_TEMP_OVER_COUNTS	2
 
@@ -938,6 +939,12 @@ static void oplus_vooc_fastchg_func(struct work_struct *work)
 			chip->fastchg_to_warm = false;
 			chip->btb_temp_over = false;
 			chip->reset_adapter = false;
+			if (chip->vooc_current_lvl && chip->vooc_strategy_normal_current > 0
+					&& chip->vooc_strategy_normal_current <= chip->vooc_current_lvl_cnt) {
+				g_fastchg_realtime_current_ma = chip->vooc_current_lvl[chip->vooc_strategy_normal_current - 1];
+			} else {
+				g_fastchg_realtime_current_ma = 10000;
+			}
 		} else {
 			chip->allow_reading = true;
 			chip->fastchg_dummy_started = true;
@@ -1165,6 +1172,12 @@ static void oplus_vooc_fastchg_func(struct work_struct *work)
 			}
 		} else {
 			pre_ret_info = ret_info;
+		}
+
+		if (chip->vooc_current_lvl && ret_info > 0 && ret_info <= chip->vooc_current_lvl_cnt) {
+			g_fastchg_realtime_current_ma = chip->vooc_current_lvl[ret_info - 1];
+		} else if (ret_info > 0 && ret_info <= ARRAY_SIZE(multistepCurrent)) {
+			g_fastchg_realtime_current_ma = multistepCurrent[ret_info - 1];
 		}
 
 		vooc_xlog_printk(CHG_LOG_CRTI, "temp_range[%d-%d-%d-%d-%d]", chip->vooc_low_temp, chip->vooc_little_cold_temp,
@@ -1804,6 +1817,14 @@ bool oplus_vooc_get_fastchg_to_normal(void)
 	} else {
 		return g_vooc_chip->fastchg_to_normal;
 	}
+}
+
+int oplus_vooc_get_fastchg_current(void)
+{
+	if (!g_vooc_chip || !g_vooc_chip->fastchg_started) {
+		return 0;
+	}
+	return g_fastchg_realtime_current_ma;
 }
 
 void oplus_vooc_set_fastchg_to_normal_false(void)

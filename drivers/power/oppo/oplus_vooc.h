@@ -352,4 +352,5 @@ bool oplus_vooc_get_reset_adapter_st(void);
 bool oplus_vooc_get_mcu_update_finish_status(void);
 void oplus_vooc_set_update_finish_status_false(void);
 int oplus_vooc_get_reset_active_status(void);
+int oplus_vooc_get_fastchg_current(void);
 #endif /* _OPLUS_VOOC_H */

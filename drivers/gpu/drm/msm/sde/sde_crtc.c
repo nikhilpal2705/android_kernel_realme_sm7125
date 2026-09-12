@@ -2049,7 +2049,7 @@ static void _sde_crtc_blend_setup_mixer(struct drm_crtc *crtc,
 	uint32_t prefill;
 	uint32_t stage_idx, lm_idx;
 	int zpos_cnt[SDE_STAGE_MAX + 1] = { 0 };
-	int i, rot_id = 0, cnt = 0, layer_mode;
+	int i, rot_id = 0, cnt = 0;
 	bool bg_alpha_enable = false;
 
 	if (!sde_crtc || !crtc->state || !mixer) {
@@ -2189,15 +2189,11 @@ static void _sde_crtc_blend_setup_mixer(struct drm_crtc *crtc,
 					zpos_max = pstate->stage;
 				SDE_EVT32(pstate->stage, cstate->fingerprint_dim_layer->stage, zpos_max);
 				if (pstate->stage == cstate->fingerprint_dim_layer->stage) {
-					layer_mode = sde_plane_check_fingerprint_layer(state);
-					if (layer_mode == 2) {
-						pstate->stage++;
-					} else {
-						if (pstate->stage > SDE_STAGE_0)
-							pstate->stage--;
-						else
-							cstate->fingerprint_dim_layer->stage++;
-					}
+					is_dim_valid = false;
+					oppo_dimlayer_fingerprint_failcount++;
+					SDE_ERROR("Skip fingerprint_dim_layer as it shared plane stage %d %d\n",
+							pstate->stage, cstate->fingerprint_dim_layer->stage);
+					SDE_EVT32(pstate->stage, cstate->fingerprint_dim_layer->stage, zpos_max, oppo_dimlayer_fingerprint_failcount);
 				}
 			}
 			if (is_dim_valid) {
@@ -5409,9 +5405,6 @@ extern bool is_oppo_aod_ramless(void);
 static int sde_crtc_onscreenfinger_atomic_check(struct sde_crtc_state *cstate,
 		struct plane_state *pstates, int cnt)
 {
-	struct sde_kms *kms;
-	int max_stages;
-	int max_plane_stage;
 	int fp_index = -1;
 	int fppressed_index = -1;
 	int aod_index = -1;
@@ -5424,12 +5417,13 @@ static int sde_crtc_onscreenfinger_atomic_check(struct sde_crtc_state *cstate,
 	int i;
 
 	/*
-	 * Detect fingerprint layers:
-	 * 1. Proprietary OPLUS HWC sets PLANE_PROP_CUSTOM.
-	 * 2. AOSP SurfaceFlinger UdfpsExtension tags touched FOD overlay
-	 *    with PLANE_PROP_ZPOS = 0x41000033.
-	 * When fppressed_index is found, staging it above the inclusive dim layer
-	 * dims the background UI while the round FOD icon shines at full HBM brightness.
+	 * Primary path: read PLANE_PROP_CUSTOM set by HWC (OPLUS vendor
+	 * binary dispatches PLANE_SET_CUSTOM during its atomic commit).
+	 * Fallback: when AOSP HWC does not set PLANE_PROP_CUSTOM, if multiple
+	 * planes are composed during FOD press (cnt >= 2), the topmost plane
+	 * (highest stage) is the UDFPS illumination overlay. Staging it above
+	 * the inclusive dim layer dims the background UI while the round FOD icon
+	 * shines at full un-dimmed HBM brightness.
 	 */
 	for (i = 0; i < cnt; i++) {
 		mode = sde_plane_check_fingerprint_layer(pstates[i].drm_pstate);
@@ -5441,6 +5435,34 @@ static int sde_crtc_onscreenfinger_atomic_check(struct sde_crtc_state *cstate,
 			aod_index = i;
 		if (pstates[i].sde_pstate)
 			pstates[i].sde_pstate->is_skip = false;
+	}
+
+	if (fppressed_index == -1 && dimlayer_hbm && fp_mode) {
+		if (cnt >= 2) {
+			int top_idx = 0;
+			int max_stage = pstates[0].stage;
+
+			for (i = 1; i < cnt; i++) {
+				if (pstates[i].stage > max_stage) {
+					max_stage = pstates[i].stage;
+					top_idx = i;
+				}
+			}
+			fppressed_index = top_idx;
+		} else if (cnt == 1) {
+			/*
+			 * Only 1 plane composed (Client target contains both UI
+			 * and the FOD illumination circle). Cannot insert a dim
+			 * layer between them in the hardware layer mixer.
+			 * Skip the dim layer so the FOD icon remains bright at
+			 * full HBM brightness, allowing sensor acquisition.
+			 */
+			oppo_underbrightness_alpha = 0;
+			cstate->fingerprint_dim_layer = NULL;
+			cstate->fingerprint_mode = dimlayer_hbm;
+			cstate->fingerprint_pressed = true;
+			return 0;
+		}
 	}
 
 	if (!is_dsi_panel(cstate->base.crtc))
@@ -5495,61 +5517,44 @@ static int sde_crtc_onscreenfinger_atomic_check(struct sde_crtc_state *cstate,
 			return 0;
 		}
 
-		kms = _sde_crtc_get_kms_(cstate->base.crtc);
-		max_stages = (kms && kms->catalog) ?
-			kms->catalog->mixer[0].sblk->maxblendstages : 7;
-		max_plane_stage = max_stages - SDE_STAGE_0;
-
 		cstate->fingerprint_mode = dimlayer_hbm;
 		cstate->fingerprint_pressed = (dimlayer_hbm && fp_mode);
 
 		SDE_DEBUG("debug for get cstate->fingerprint_mode = %d\n", cstate->fingerprint_mode);
 
+		if (aod_index >= 0) {
+			if (zpos > pstates[aod_index].stage)
+				zpos = pstates[aod_index].stage;
+			pstates[aod_index].stage++;
+		}
 		if (fppressed_index >= 0) {
-			pstates[fppressed_index].stage = max_plane_stage;
-			zpos = max_plane_stage - 1;
+			if (zpos > pstates[fppressed_index].stage)
+				zpos = pstates[fppressed_index].stage;
+			pstates[fppressed_index].stage++;
+		}
+		if (fp_index >= 0) {
+			if (zpos > pstates[fp_index].stage)
+				zpos = pstates[fp_index].stage;
+			pstates[fp_index].stage++;
+		}
 
+		for (i = 0; i < cnt; i++) {
+			if (i == fp_index || i == fppressed_index ||
+			    i == aod_index)
+				continue;
+			if (pstates[i].stage >= zpos) {
+				pstates[i].stage++;
+			}
+		}
+
+		if (zpos == INT_MAX) {
+			zpos = 0;
+			dimlayer_is_top = true;
 			for (i = 0; i < cnt; i++) {
-				if (i == fppressed_index)
-					continue;
-				if (pstates[i].stage >= zpos) {
-					pstates[i].stage = zpos - 1;
-					if (pstates[i].stage < 0)
-						pstates[i].stage = 0;
-				}
+				if (pstates[i].stage > zpos)
+					zpos = pstates[i].stage;
 			}
-		} else {
-			if (aod_index >= 0) {
-				if (zpos > pstates[aod_index].stage)
-					zpos = pstates[aod_index].stage;
-				pstates[aod_index].stage++;
-			}
-			if (fp_index >= 0) {
-				if (zpos > pstates[fp_index].stage)
-					zpos = pstates[fp_index].stage;
-				pstates[fp_index].stage++;
-			}
-
-			for (i = 0; i < cnt; i++) {
-				if (i == fp_index || i == aod_index)
-					continue;
-				if (pstates[i].stage >= zpos) {
-					pstates[i].stage++;
-				}
-			}
-
-			if (zpos == INT_MAX) {
-				zpos = 0;
-				dimlayer_is_top = true;
-				for (i = 0; i < cnt; i++) {
-					if (pstates[i].stage > zpos)
-						zpos = pstates[i].stage;
-				}
-				zpos++;
-			}
-
-			if (zpos >= max_plane_stage)
-				zpos = max_plane_stage - 1;
+			zpos++;
 		}
 
 		SDE_EVT32(zpos, fp_index, aod_index, fppressed_index, cstate->num_dim_layers);
@@ -5562,8 +5567,14 @@ static int sde_crtc_onscreenfinger_atomic_check(struct sde_crtc_state *cstate,
 				cstate->fingerprint_pressed = false;
 				return 0;
 			}
-			SDE_EVT32(zpos, fp_index, aod_index, fppressed_index, cstate->num_dim_layers);
-			return -EINVAL;
+			if (fppressed_index >= 0) {
+				pstates[fppressed_index].stage--;
+			}
+			oppo_underbrightness_alpha = 0;
+			cstate->fingerprint_dim_layer = NULL;
+			cstate->fingerprint_mode = dimlayer_hbm;
+			cstate->fingerprint_pressed = (dimlayer_hbm && fp_mode);
+			return 0;
 		}
 
 		cstate->fingerprint_pressed = (dimlayer_hbm && fp_mode);
@@ -5787,10 +5798,6 @@ static int sde_crtc_atomic_check(struct drm_crtc *crtc,
 		return rc;
 #endif /* OPLUS_FEATURE_AOD_RAMLESS */
 
-	rc = sde_crtc_onscreenfinger_atomic_check(cstate, pstates, cnt);
-	if (rc)
-		goto end;
-#endif /* OPLUS_BUG_STABILITY */
 	/* assign mixer stages based on sorted zpos property */
 	if (cnt > 0)
 		sort(pstates, cnt, sizeof(pstates[0]), pstate_cmp, NULL);
@@ -5810,6 +5817,15 @@ static int sde_crtc_atomic_check(struct drm_crtc *crtc,
 			pstates[i].stage = z_pos;
 		}
 	}
+
+#ifdef OPLUS_BUG_STABILITY
+/* Sachin Shukla@PSW.MM.Display.Service.Feature,2018/11/21
+ * For OnScreenFingerprint feature
+*/
+	rc = sde_crtc_onscreenfinger_atomic_check(cstate, pstates, cnt);
+	if (rc)
+		goto end;
+#endif /* OPLUS_BUG_STABILITY */
 
 	z_pos = -1;
 	for (i = 0; i < cnt; i++) {

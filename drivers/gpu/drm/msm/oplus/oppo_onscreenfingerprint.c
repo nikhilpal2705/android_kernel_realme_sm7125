@@ -599,7 +599,7 @@ int sde_crtc_config_fingerprint_dim_layer(struct drm_crtc_state *crtc_state,
 	}
 
 	if ((stage + SDE_STAGE_0) >= kms->catalog->mixer[0].sblk->maxblendstages) {
-		stage = kms->catalog->mixer[0].sblk->maxblendstages - 1 - SDE_STAGE_0;
+		return -EINVAL;
 	}
 
 	fingerprint_dim_layer = &cstate->dim_layer[cstate->num_dim_layers];
@@ -725,7 +725,6 @@ _sde_encoder_setup_dither_for_onscreenfingerprint(
 int sde_plane_check_fingerprint_layer(const struct drm_plane_state *drm_state)
 {
 	struct sde_plane_state *pstate;
-	int custom, zpos;
 
 	if (!drm_state) {
 		return 0;
@@ -733,16 +732,6 @@ int sde_plane_check_fingerprint_layer(const struct drm_plane_state *drm_state)
 
 	pstate = to_sde_plane_state(drm_state);
 
-	custom = sde_plane_get_property(pstate, PLANE_PROP_CUSTOM);
-	if (custom)
-		return custom;
-
-	zpos = sde_plane_get_property(pstate, PLANE_PROP_ZPOS);
-	if (zpos == 0x41000033 || zpos == 0x41000032)
-		return 2;
-	if (zpos == 0x41000031)
-		return 1;
-
-	return 0;
+	return sde_plane_get_property(pstate, PLANE_PROP_CUSTOM);
 }
 
